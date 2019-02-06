@@ -1,0 +1,184 @@
+---
+title: "What made you happy?"
+author: "Sitong Liu"
+date: "February 6, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r pressure, echo=FALSE, fig.cap=" ", out.width = '100%'}
+knitr::include_graphics("tenor.gif")
+```
+
+```{r, warning=FALSE, message=FALSE,echo=FALSE}
+## Step 0: Import libraries
+library(tidyverse)
+library(tidytext)
+library(DT)
+library(scales)
+library(gridExtra)
+library(ngram)
+library(shiny) 
+library("tm")
+library("SnowballC")
+library("wordcloud")
+library("RColorBrewer")
+library(igraph)
+library(ggraph)
+```
+
+
+```{r load data, warning=FALSE, message=FALSE,echo=FALSE}
+## Step 1: Load the datasets
+hm_data <- read_csv("processed_moments.csv")
+demo_data <- read_csv('demographic.csv')
+```
+
+
+```{r combining data, warning=FALSE, message=FALSE,echo=FALSE}
+##Step 2: Combine the datasets:
+hm_data <- hm_data %>%
+  inner_join(demo_data, by = "wid") %>%
+  select(wid,
+         original_hm,
+         gender, 
+         marital, 
+         num_sentence,
+         parenthood,
+         reflection_period,
+         age, 
+         country, 
+         ground_truth_category, 
+         predicted_category,
+         text) %>%
+  mutate(count = sapply(hm_data$text, wordcount)) %>%
+  filter(gender %in% c("m", "f")) %>%
+  filter(marital %in% c("single", "married","divorced","widowed")) %>%
+  filter(parenthood %in% c("n", "y")) %>%
+  filter(reflection_period %in% c("24h", "3m")) %>%
+  mutate(reflection_period = fct_recode(reflection_period, 
+                                        months_3 = "3m", hours_24 = "24h"))
+hm_data=data.frame(hm_data)
+
+```
+
+
+```{r bag of words, warning=FALSE, message=FALSE,echo=FALSE}
+### Create a bag of words using the text data
+bag_of_words <-  hm_data %>%
+  unnest_tokens(word, text)
+word_count <- bag_of_words %>%
+  count(word, sort = TRUE)
+```
+## Part A: Keywords for Happiness
+\newline
+### Words that people mention the most for happiness
+```{r ,warning=FALSE,error=FALSE,echo=FALSE,message=FALSE,echo=FALSE}
+wordcloud(word_count$word, word_count$n, max.words=100, colors=brewer.pal(1, "Dark2"))
+``` 
+\newline
+
+#### From the frequency plot, we observe that the Word 'Friend' has the highest frequency, so we believe that most people announced that friends can actually bring them happiness. 
+\newline
+
+```{r, echo=FALSE, fig.cap=" ", out.width = '10%'}
+knitr::include_graphics("tenor.gif")
+```
+## Part B Relationship between Predicted Category and Happiness
+
+### Table of the frequency of Predicted Category for happiness
+
+```{r,warning=FALSE,error=FALSE,echo=FALSE,message=FALSE,echo=FALSE}
+### Create a Frequency table of Predicted Category
+table_1<-data.frame(table((hm_data$predicted_category)))
+colnames(table_1)<-c("Predicted Category","Frequency")
+table_1
+```
+#### From the table we obeserve that there are  7 different predicted categories for happiness, and 'affection' has be mentioned the most. Thus, we believbe affection is an important factor of hapiness for most people 
+```{r, echo=FALSE, fig.cap=" ", out.width = '10%'}
+knitr::include_graphics("tenor.gif")
+```
+## Part C Friend & Predicted Category in Happiness
+
+### Frequency of 'Friend' mentioned in different category
+```{r,warning=FALSE,error=FALSE,echo=FALSE,message=FALSE,echo=FALSE}
+achievement_friend<-(length(which(grepl("friend",hm_data$text) &grepl('achievement',hm_data$predicted_category))))
+
+affection_friend<-length(which(grepl("friend",hm_data$text) &grepl('affection',hm_data$predicted_category)))
+
+bonding_friend<-length(which(grepl("friend",hm_data$text) &grepl('bonding',hm_data$predicted_category)))
+
+enjoy_friend<-length(which(grepl("friend",hm_data$text) &grepl('enjoy_the_moment',hm_data$predicted_category)))
+
+leisure_friend<-length(which(grepl("friend",hm_data$text) &grepl('leisure',hm_data$predicted_category)))
+
+nature_friend<-length(which(grepl("friend",hm_data$text) &grepl('nature',hm_data$predicted_category)))
+
+exercise_friend<-length(which(grepl("friend",hm_data$text) &grepl('excercise',hm_data$predicted_category)))
+
+len_achievement<-(length(which(hm_data$predicted_category=='achievement')))
+len_affection<-(length(which(hm_data$predicted_category=='affection')))
+len_bonding<-(length(which(hm_data$predicted_category=='bonding')))
+len_exercise<-(length(which(hm_data$predicted_category=='exercise')))
+len_leisure<-(length(which(hm_data$predicted_category=='leisure')))
+len_nature<-(length(which(hm_data$predicted_category=='nature')))
+len_enjoy_the_moment<-(length(which(hm_data$predicted_category=='enjoy_the_moment')))
+
+length_var<-c(len_achievement,len_affection,len_bonding,len_exercise,len_enjoy_the_moment,len_leisure,len_nature)
+levels<-factor(c("achievement","affection","bonding","exercise","enjoy_the_moment","leisure","nature"))
+frequency<-c(achievement_friend,affection_friend,bonding_friend,exercise_friend,enjoy_friend,leisure_friend,nature_friend)
+percentage<-c(round((achievement_friend/len_achievement)*100,3),round((affection_friend/len_affection)*100,3),round((bonding_friend/len_bonding)*100,3),round((exercise_friend/len_exercise)*100,3),round((enjoy_friend/len_enjoy_the_moment)*100,3),round((leisure_friend/len_leisure)*100,3),round((nature_friend/len_nature)*100,3))
+table_f<-data.frame('Predicted'=levels,'Percentage of friend mentioned'=percentage)
+table_f
+
+```
+#### From the table we observe that friends has been mentioned the most in the catrgory of bonding. We announce that connecting with friends can actually bring happiness to people. 
+```{r, echo=FALSE, fig.cap=" ", out.width = '10%'}
+knitr::include_graphics("tenor.gif")
+```
+## Part D Gender & Friend in Happiness
+### Does gender affect the happiness that brought by friends?
+```{r,warning=FALSE,error=FALSE,echo=FALSE,message=FALSE}
+table_g<-table(data.frame(hm_data$gender))
+f_friend<-length(which(grepl("friend",hm_data$text) &grepl('f',hm_data$gender)))
+m_friend<-length(which(grepl("friend",hm_data$text) &grepl('m',hm_data$gender)))
+len_f<-length(which(hm_data$gender=='f'))
+len_m<-length(which(hm_data$gender=='m'))
+level<-factor(c("Male","Female"))
+percentage_g<-c(round((f_friend/len_f)*100,3),round(( m_friend/len_m)*100,3))
+
+table_gender<-data.frame("Gender"=level,"Percentage of friend mentioned"=percentage_g)
+table_gender
+
+
+```  
+#### From the above that we do not see much difference between male and female, so it might because that friend are equally likely important for both gender. 
+```{r, echo=FALSE, fig.cap=" ", out.width = '10%'}
+knitr::include_graphics("tenor.gif")
+```
+## Part E Sentiment & Happiness (Word)
+```{r,warning=FALSE,error=FALSE,echo=FALSE,message=FALSE}
+library(reshape2)
+bag_of_words %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+  comparison.cloud(colors = c("gray80", "gray20"),
+                   max.words = 150)
+```
+
+#### From the above graph, we see that there are some positive words that people uses to express their happiness, such as enjoyed, nice, favorite and love, also there are some negative words appear into people's words, that should be ignore, such as pain, mess, delayed. 
+
+```{r, echo=FALSE, fig.cap=" ", out.width = '10%'}
+knitr::include_graphics("red-flowers-animated.gif")
+```
+## Conclusion
+### When people mention happiness, no matter the gender, most people would like to mention the moment that stay or connect with friends. Thus, most people select bonding as a factor of happiness because of friends. In addition, many people also consider that affection is an important fector for happiness. When discribing happiness, people use some postive words, such as enjoyed, nice, favorite. However, there are some negative words appear when they are telling a story, but these kind of words should be ignored. 
+
+
+
+
+
